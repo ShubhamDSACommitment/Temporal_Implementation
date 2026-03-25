@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vue-tsc:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.camunda.io)",
+      "WebFetch(domain:www.jointjs.com)",
+      "WebFetch(domain:camunda.com)",
+      "Bash(npx vite:*)",
+      "Bash(go build:*)"
+    ]
+  }
+}

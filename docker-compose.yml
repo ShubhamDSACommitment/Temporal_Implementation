@@ -1,4 +1,3 @@
-
 services:
   # PostgreSQL database for Temporal
   postgresql:
@@ -12,6 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgresql_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
       - temporal-network
 
@@ -61,6 +61,76 @@ services:
       - temporal-network
     stdin_open: true
     tty: true
+
+  # Order Service — runs OrderWorkflow + order activities
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    container_name: order-service
+    depends_on:
+      - temporal
+      - temporal-gateway
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - HEALTH_PORT=8081
+      - GATEWAY_URL=http://temporal-gateway:8090
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure
+    networks:
+      - temporal-network
+
+  # Payment Service — runs payment activities on payment-task-queue
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    container_name: payment-service
+    depends_on:
+      - temporal
+      - temporal-gateway
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - HEALTH_PORT=8082
+      - GATEWAY_URL=http://temporal-gateway:8090
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure
+    networks:
+      - temporal-network
+
+  # Temporal Gateway — workflow designer API + dynamic workflow worker
+  temporal-gateway:
+    build:
+      context: .
+      dockerfile: temporal-gateway/Dockerfile
+    container_name: temporal-gateway
+    depends_on:
+      - temporal
+      - postgresql
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - DATABASE_URL=postgres://temporal:temporal@postgresql:5432/workflow_designer?sslmode=disable
+      - PORT=8090
+      - STATIC_DIR=/static
+    ports:
+      - "8090:8090"
+    restart: on-failure
+    networks:
+      - temporal-network
 
 volumes:
   postgresql_data:
